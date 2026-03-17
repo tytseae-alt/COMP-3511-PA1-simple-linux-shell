@@ -201,13 +201,32 @@ int main()
             }
             continue; //continue if everything fine
         }
+/*
+        else if(!strcmp(arg[0], "wc") && !strcmp(arg[1], "-l")){ //implement of the wc -l < file command 
+            if(!strcmp(arg[2], "<")){ //input redirection case: file content input to feed wc command --> count number of lines 
+                int fd = open(arg[3], O_RDONLY); //get file id 
+                char buffer[4096]; //buffer for reading file text 
+                int bytes; 
+                int lines = 0; 
+                close(0); //closing stdin, file descriptor 0
+                dup(fd); //replace stdin with file, automatically look for smallest available descriptor
+                while((bytes = read(fd, buffer, 4096))>0){ //read return byte it read, keeps returning the accumulate amount it read until all, then return zero 
+                    for(int i = 0; i < bytes; i++){ //search for next line character and increase counter 
+                        if(buffer[i] == '\n'){
+                            lines++;
+                        }
+                    }
+                }
+                printf("%d\n", lines); //display amount of (nextline character) lines
+            }
+        }
         else {
             strcpy(cmdline, cmdlineCopy); //for some reason cmdline change? 
             //restore it if it is not cd, i.e some other command using "|" as seperation
             continue; //continue the loop so it doesn't stuck here 
             //but what if we need the latter codes????~
         }
-
+*/
 
         pid_t pid = fork();
         if (pid == 0)
