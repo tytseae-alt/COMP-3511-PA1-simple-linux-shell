@@ -148,7 +148,10 @@ void process_cmd(char *cmdline)
 }
 
 // TODO: Implement a signal handler
-
+void signal_callback(int sig){
+    printf(TEMPLATE_MYSHELL_TERMINATE, getpid(),sig);
+    exit(1);
+}
 
 /* The main function implementation */
 int main()
@@ -156,7 +159,7 @@ int main()
     printf("%s\n\n", MYSHELL_MESSAGE);
 
     // TODO: Associate the interrupt signal to the handler
-
+    signal(SIGINT, signal_callback);
     // TODO: replace the shell prompt with your ITSC account name
     // For example, if you ITSC account is cspeter@connect.ust.hk
     // You should replace ITSC with cspeter
