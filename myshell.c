@@ -85,13 +85,12 @@ void show_prompt(char *prompt, char *path)
     // TODO: replace the shell prompt with your ITSC account name
     // For example, if you ITSC account is cspeter@connect.ust.hk
     // You should replace ITSC with cspeter
-    prompt = "tytseae";
     printf("%s %s> ", prompt, path);
 }
 
 // This function will be invoked by main()
 // This function is given
-int get_cmd_line(char *cmdline)
+int get_cmd_line(char *cmdline) //
 {
     int i;
     int n;
@@ -161,7 +160,7 @@ int main()
     // TODO: replace the shell prompt with your ITSC account name
     // For example, if you ITSC account is cspeter@connect.ust.hk
     // You should replace ITSC with cspeter
-    char *prompt = "ITSC";
+    char *prompt = "tytseae";
     char cmdline[MAX_CMDLINE_LENGTH];
     char cmdlineCopy[MAX_CMDLINE_LENGTH];
     printf(TEMPLATE_MYSHELL_START, getpid());
