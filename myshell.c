@@ -143,11 +143,30 @@ void process_cmd(char *cmdline) //only child calls it, as execvp replace address
     // Uncomment this line to check the content of cmdline
     //printf("cmdline = %s\n", cmdline);
     //my setup restore cmdline to its original form 
-    //so Step 1: get tokenized cmdline into arg 
-    if(strcmp(cmdline,"wc")){ //handle wc redirection
-        
-    }
 
+    //so Step 1: get tokenized cmdline into arg 
+    char *arg[MAX_ARGUMENTS]; //tokenized arguments in arg[0], arg[1] ... 
+    int arg_num; //number of tokens 
+    parse_arguments(arg, cmdline, &arg_num,SPACE_CHARS); //store tokens in arg 
+    
+    // cmdline only has arg[0] now 
+    //for loop handle the input and output redirection case 
+    for(int i = 0; i < arg_num; i++){ //search for index i for "<" 
+        if(!strcmp(arg[i], "<")){  //input case
+            int fd = open(arg[i+1], O_RDONLY); // use open to get file descriptor of that particular file 
+            //open() note: arg[i+1] is the file name, O_RDONLY is the flag for read only access 
+            dup2(fd, 0); // stdin(0) points to the new fd --> redirection 
+        }
+
+        if(!strcmp(arg[i], ">")){  //input case
+            int fd = open(arg[i+1], O_WRONLY | O_CREAT | O_TRUNC); // use open to get file descriptor of that particular file 
+            //open() note: arg[i+1] is the file name, and apparently we need more flag
+            dup2(fd, 1); // stdin(1) points to the new fd --> redirection 
+        }
+
+    }
+    execvp(arg[0], arg); //execute: replace the fork with arg[0] binary, eg wc, ls, etc
+    //arg is the pointer to char * (array of strings) stores the tokenized command
     exit(0); // ensure the process cmd is finished
 }
 
@@ -194,7 +213,7 @@ int main()
         // TODO: implement the cd command
         // Hint: You can use parse_arguments here
         // The 2nd param will be changed after calling parse_arguments, so we need to backup a copy  
-        // the change: wc -l < myshell.c -> wc
+        // the change: wc -l < myshell.c -> wc as it inserts null terminator whenever there's SPACE_CHARS
         strcpy(cmdlineCopy, cmdline);
         parse_arguments(arg, cmdline, &arg_num, SPACE_CHARS); //divide command according to space, store segments to arg array 
         strcpy(cmdline, cmdlineCopy); //restore cmdline 
