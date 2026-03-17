@@ -138,11 +138,15 @@ void parse_arguments(char **argv, char *line, int *numTokens, char *delimiter)
 }
 
 // TODO: Implement process_cmd
-void process_cmd(char *cmdline)
-{
+void process_cmd(char *cmdline) //only child calls it, as execvp replace address space 
+{ //all happens in child process 
     // Uncomment this line to check the content of cmdline
-    // printf("cmdline = %s\n", cmdline);
-    
+    //printf("cmdline = %s\n", cmdline);
+    //my setup restore cmdline to its original form 
+    //so Step 1: get tokenized cmdline into arg 
+    if(strcmp(cmdline,"wc")){ //handle wc redirection
+        
+    }
 
     exit(0); // ensure the process cmd is finished
 }
@@ -190,8 +194,11 @@ int main()
         // TODO: implement the cd command
         // Hint: You can use parse_arguments here
         // The 2nd param will be changed after calling parse_arguments, so we need to backup a copy  
+        // the change: wc -l < myshell.c -> wc
         strcpy(cmdlineCopy, cmdline);
-        parse_arguments(arg, cmdline, &arg_num, " "); //divide command according to space, store segments to arg array 
+        parse_arguments(arg, cmdline, &arg_num, SPACE_CHARS); //divide command according to space, store segments to arg array 
+        strcpy(cmdline, cmdlineCopy); //restore cmdline 
+        //special case: cd handling 
         if(!strcmp(arg[0],"cd")){ //detect if its cd 
             strcpy(path, arg[1]); //change the path variable to destination
             int flag = chdir(path); //head to path, store status in flag  
