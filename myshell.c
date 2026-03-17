@@ -191,6 +191,22 @@ int main()
         // Hint: You can use parse_arguments here
         // The 2nd param will be changed after calling parse_arguments, so we need to backup a copy  
         strcpy(cmdlineCopy, cmdline);
+        parse_arguments(arg, cmdline, &arg_num, " "); //divide command according to space, store segments to arg array 
+        if(!strcmp(arg[0],"cd")){ //detect if its cd 
+            strcpy(path, arg[1]); //change the path variable to destination
+            int flag = chdir(path); //head to path, store status in flag  
+            if(flag == -1){ //fail condition 
+                printf(TEMPLATE_MYSHELL_CD_ERROR); //print error message 
+                continue; //continue the polling
+            }
+            continue; //continue if everything fine
+        }
+        else {
+            strcpy(cmdline, cmdlineCopy); //for some reason cmdline change? 
+            //restore it if it is not cd, i.e some other command using "|" as seperation
+            continue; //continue the loop so it doesn't stuck here 
+            //but what if we need the latter codes????~
+        }
 
 
         pid_t pid = fork();
