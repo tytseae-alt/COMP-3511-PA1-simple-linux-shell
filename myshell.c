@@ -170,6 +170,7 @@ int main()
     char path[256];
 
     // The main event loop
+    char exit[] = "exit";
     while (1)
     {
         getcwd(path, 256);
@@ -178,7 +179,11 @@ int main()
             continue; /* empty line handling */
 
         // TODO: implement the exit command
-
+        if(!strcmp(cmdline,exit)){
+            printf(TEMPLATE_MYSHELL_END, getpid());
+            break;
+        }
+            
         // TODO: implement the cd command
         // Hint: You can use parse_arguments here
         // The 2nd param will be changed after calling parse_arguments, so we need to backup a copy  
