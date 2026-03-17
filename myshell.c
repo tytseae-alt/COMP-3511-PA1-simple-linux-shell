@@ -81,9 +81,11 @@
 // TODO: Replace the shell prompt with your own ITSC account name
 void show_prompt(char *prompt, char *path)
 {
+
     // TODO: replace the shell prompt with your ITSC account name
     // For example, if you ITSC account is cspeter@connect.ust.hk
     // You should replace ITSC with cspeter
+    prompt = "tytseae";
     printf("%s %s> ", prompt, path);
 }
 
