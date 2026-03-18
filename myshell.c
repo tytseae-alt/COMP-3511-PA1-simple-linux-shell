@@ -256,7 +256,6 @@ int main()
             }
             continue; // continue if everything fine
         }
-        strcpy(cmdline, cmdlineCopy); // restore it here, after the cd has ended
         /*
                 else if(!strcmp(arg[0], "wc") && !strcmp(arg[1], "-l")){ //implement of the wc -l < file command
                     if(!strcmp(arg[2], "<")){ //input redirection case: file content input to feed wc command --> count number of lines
@@ -298,10 +297,10 @@ int main()
                 //input of wc is ls
 
         */
-        strcpy(cmdlineCopy, cmdline);           // restore cmdline
+
         char *pipe_segments[MAX_PIPE_SEGMENTS]; // array of strings to store pipe command segments
         int num_pipe_segments;
-        parse_arguments(pipe_segments, cmdline, &num_pipe_segments, PIPE_CHAR); // parse our cmdline according to pipe char |
+        parse_arguments(pipe_segments, cmdlineCopy, &num_pipe_segments, PIPE_CHAR); // FIXED: use clean copy (was cmdline)
         strcpy(cmdline, cmdlineCopy);                                           // restore cmdline
 
         if (num_pipe_segments == 1)
@@ -311,6 +310,46 @@ int main()
                 process_cmd(cmdline); // child will execvp and process cmdline
             else
                 wait(0); // parent will wait for child to terminate
+        }
+        else
+        { // else that we have some  | | | | | bruh
+            int pipes[MAX_PIPE_SEGMENTS - 1][2];
+            for (int i = 0; i < num_pipe_segments - 1; i++)
+            {
+                pipe(pipes[i]); // create whatever amount of pipe we need
+            }
+            for (int i = 0; i < num_pipe_segments; i++)
+            {
+                pid_t pid = fork();
+                if (pid == 0)
+                { // child
+                    if (i > 0)
+                    {                                        // not first segment
+                        dup2(pipes[i - 1][0], STDIN_FILENO); // i-1: if we on 2 segment, we using pipe 1
+                        // stdin now comes from
+                        close(pipes[i - 1][0]); // tell kernel these fd are not needed anymore
+                        close(pipes[i - 1][1]); // tell kernel these fd are not needed anymore
+                    }
+                    if (i < num_pipe_segments - 1)
+                    {                                     // not the last segment
+                        dup2(pipes[i][1], STDOUT_FILENO); // ← write end of CURRENT pipe
+                        close(pipes[i][0]);               // tell kernel these fd are not needed anymore
+                        close(pipes[i][1]);               // tell kernel these fd are not needed anymore
+                    }
+                    process_cmd(pipe_segments[i]); // well, process
+                }
+                // parent need to do the cleanup, close every pipe read write
+            }
+            // parent cleanup (moved here so it runs only once after all forks)
+            for (int i = 0; i < num_pipe_segments - 1; i++)
+            {
+                close(pipes[i][0]);
+                close(pipes[i][1]);
+            }
+            for (int i = 0; i < num_pipe_segments; i++)
+            {
+                wait(0);
+            }
         }
     }
     return 0;
