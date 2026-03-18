@@ -138,69 +138,60 @@ void parse_arguments(char **argv, char *line, int *numTokens, char *delimiter)
 }
 
 // TODO: Implement process_cmd
-void process_cmd(char *cmdline) // only child calls it, as execvp replace address space
-{                               // all happens in child process
+void process_cmd(char *cmdline) //only child calls it, as execvp replace address space 
+{ //all happens in child process 
     // Uncomment this line to check the content of cmdline
-    // printf("cmdline = %s\n", cmdline);
-    // my setup restore cmdline to its original form
+    //printf("cmdline = %s\n", cmdline);
+    //my setup restore cmdline to its original form 
 
-    // so Step 1: get tokenized cmdline into arg
-    char *arg[MAX_ARGUMENTS]; // tokenized arguments in arg[0], arg[1] ...
-    int arg_num;              // number of tokens
-    char cmdlineCopy[MAX_CMDLINE_LENGTH];
-    strcpy(cmdlineCopy, cmdline);                         // backup cmdline for pipe later
-    parse_arguments(arg, cmdline, &arg_num, SPACE_CHARS); // store tokens in arg
+    //so Step 1: get tokenized cmdline into arg 
+    char *arg[MAX_ARGUMENTS]; //tokenized arguments in arg[0], arg[1] ... 
+    int arg_num; //number of tokens 
+    parse_arguments(arg, cmdline, &arg_num,SPACE_CHARS); //store tokens in arg 
+    
+    // cmdline only has arg[0] now 
+    //for loop handle the input redirection case 
+    for(int i = 0; i < arg_num; i++){ //search for index i for "<" 
+        if(!strcmp(arg[i], "<")){  //input case
+            int fd = open(arg[i+1], O_RDONLY); // use open to get file descriptor of that particular file 
+            //open() note: arg[i+1] is the file name, O_RDONLY is the flag for read only access 
+            dup2(fd, 0); // stdin(0) points to the new fd --> redirection 
+            close(fd); //closing fd, why we do this? lab example?
 
-    // cmdline only has arg[0] now
-    // for loop handle the input redirection case
-    for (int i = 0; i < arg_num; i++)
-    { // search for index i for "<"
-        if (!strcmp(arg[i], "<"))
-        {                                        // input case
-            int fd = open(arg[i + 1], O_RDONLY); // use open to get file descriptor of that particular file
-            // open() note: arg[i+1] is the file name, O_RDONLY is the flag for read only access
-            dup2(fd, 0); // stdin(0) points to the new fd --> redirection
-            close(fd);   // closing fd, why we do this? lab example?
-
-            // now we delete the < filename before we pass it to the binary
-            for (int j = i; j < arg_num - 2; j++)
-            { // the "<"
+            //now we delete the < filename before we pass it to the binary 
+            for (int j = i; j < arg_num - 2; j++) { //the "<"
                 arg[j] = arg[j + 2];
             }
             arg_num -= 2;
-            break; // end for as we handle at most 1 of this
+            break; //end for as we handle at most 1 of this
         }
     }
-    for (int i = 0; i < arg_num; i++)
-    { // handle output case
-        if (!strcmp(arg[i], ">"))
-        {                                                            // output case
-            int fd = open(arg[i + 1], O_WRONLY | O_CREAT | O_TRUNC); // use open to get file descriptor of that particular file
-            // open() note: arg[i+1] is the file name, and apparently we need more flag
-            dup2(fd, 1); // stdin(1) points to the new fd --> redirection
-            close(fd);   ////closing fd, why we do this? lab example?
+    for(int i = 0; i < arg_num; i++){ //handle output case
+        if(!strcmp(arg[i], ">")){  //output case
+            int fd = open(arg[i+1], O_WRONLY | O_CREAT | O_TRUNC); // use open to get file descriptor of that particular file 
+            //open() note: arg[i+1] is the file name, and apparently we need more flag
+            dup2(fd, 1); // stdin(1) points to the new fd --> redirection 
+            close(fd); ////closing fd, why we do this? lab example?
 
-            // now we delete the > filename before we pass it to the binary
-            for (int j = i; j < arg_num - 2; j++)
-            { // the ">"
+            //now we delete the > filename before we pass it to the binary 
+            for (int j = i; j < arg_num - 2; j++) { //the ">"
                 arg[j] = arg[j + 2];
             }
             arg_num -= 2;
 
-            break; // end for as we only need to do one of it at a time
+            break;//end for as we only need to do one of it at a time
         }
     }
-    arg[arg_num] = NULL; // required by execvp
-
-    execvp(arg[0], arg); // execute: replace the fork with arg[0] binary, eg wc, ls, etc
-    // arg is the pointer to char * (array of strings) stores the tokenized command
+    arg[arg_num] = NULL; //required by execvp
+    
+    execvp(arg[0], arg); //execute: replace the fork with arg[0] binary, eg wc, ls, etc
+    //arg is the pointer to char * (array of strings) stores the tokenized command
     exit(0); // ensure the process cmd is finished
 }
 
 // TODO: Implement a signal handler
-void signal_callback(int sig)
-{
-    printf(TEMPLATE_MYSHELL_TERMINATE, getpid(), sig);
+void signal_callback(int sig){
+    printf(TEMPLATE_MYSHELL_TERMINATE, getpid(),sig);
     exit(1);
 }
 
@@ -233,90 +224,82 @@ int main()
             continue; /* empty line handling */
 
         // TODO: implement the exit command
-        if (!strcmp(cmdline, exit))
-        {
+        if(!strcmp(cmdline,exit)){
             printf(TEMPLATE_MYSHELL_END, getpid());
             break;
         }
-
+            
         // TODO: implement the cd command
         // Hint: You can use parse_arguments here
-        // The 2nd param will be changed after calling parse_arguments, so we need to backup a copy
+        // The 2nd param will be changed after calling parse_arguments, so we need to backup a copy  
         // the change: wc -l < myshell.c -> wc as it inserts null terminator whenever there's SPACE_CHARS
         strcpy(cmdlineCopy, cmdline);
-        parse_arguments(arg, cmdline, &arg_num, SPACE_CHARS); // divide command according to space, store segments to arg array
-        // when did I add this???//strcpy(cmdline, cmdlineCopy); //restore cmdline
-        // special case: cd handling
-        if (!strcmp(arg[0], "cd"))
-        {                           // detect if its cd
-            strcpy(path, arg[1]);   // change the path variable to destination
-            int flag = chdir(path); // head to path, store status in flag
-            if (flag == -1)
-            {                                      // fail condition
-                printf(TEMPLATE_MYSHELL_CD_ERROR); // print error message
-                continue;                          // continue the polling
+        parse_arguments(arg, cmdline, &arg_num, SPACE_CHARS); //divide command according to space, store segments to arg array 
+        //when did I add this???//strcpy(cmdline, cmdlineCopy); //restore cmdline 
+        //special case: cd handling 
+        if(!strcmp(arg[0],"cd")){ //detect if its cd 
+            strcpy(path, arg[1]); //change the path variable to destination
+            int flag = chdir(path); //head to path, store status in flag  
+            if(flag == -1){ //fail condition 
+                printf(TEMPLATE_MYSHELL_CD_ERROR); //print error message 
+                continue; //continue the polling
             }
-            continue; // continue if everything fine
+            continue; //continue if everything fine
         }
-        /*
-                else if(!strcmp(arg[0], "wc") && !strcmp(arg[1], "-l")){ //implement of the wc -l < file command
-                    if(!strcmp(arg[2], "<")){ //input redirection case: file content input to feed wc command --> count number of lines
-                        int fd = open(arg[3], O_RDONLY); //get file id
-                        char buffer[4096]; //buffer for reading file text
-                        int bytes;
-                        int lines = 0;
-                        close(0); //closing stdin, file descriptor 0
-                        dup(fd); //replace stdin with file, automatically look for smallest available descriptor
-                        while((bytes = read(fd, buffer, 4096))>0){ //read return byte it read, keeps returning the accumulate amount it read until all, then return zero
-                            for(int i = 0; i < bytes; i++){ //search for next line character and increase counter
-                                if(buffer[i] == '\n'){
-                                    lines++;
-                                }
-                            }
+        strcpy(cmdline, cmdlineCopy); //restore it here, after the cd has ended
+/*      
+        else if(!strcmp(arg[0], "wc") && !strcmp(arg[1], "-l")){ //implement of the wc -l < file command 
+            if(!strcmp(arg[2], "<")){ //input redirection case: file content input to feed wc command --> count number of lines 
+                int fd = open(arg[3], O_RDONLY); //get file id 
+                char buffer[4096]; //buffer for reading file text 
+                int bytes; 
+                int lines = 0; 
+                close(0); //closing stdin, file descriptor 0
+                dup(fd); //replace stdin with file, automatically look for smallest available descriptor
+                while((bytes = read(fd, buffer, 4096))>0){ //read return byte it read, keeps returning the accumulate amount it read until all, then return zero 
+                    for(int i = 0; i < bytes; i++){ //search for next line character and increase counter 
+                        if(buffer[i] == '\n'){
+                            lines++;
                         }
-                        printf("%d\n", lines); //display amount of (nextline character) lines
                     }
                 }
-                else {
-                    strcpy(cmdline, cmdlineCopy); //for some reason cmdline change?
-                    //restore it if it is not cd, i.e some other command using "|" as seperation
-                    continue; //continue the loop so it doesn't stuck here
-                    //but what if we need the latter codes????~
-                }
-        */
-
-        // pipe handling
-        /*
-        eg: ls | wc -l
-        for (n level pipe)
-            int pipe_arr[2]; // arr[0] is input end, arr[1] is output end
-            pipe(pipe_arr);
-            fork();
-            if(pid == 0) // inside child
-                dup2(arr[0], STDOUT) //stdout of child(ls) input to pipe
-                execlp(ls command portion)
-            else //inside parent
-                dup2(arr[1], STDIN) //input of parent is output of child
-                //input of wc is ls
-
-        */
-        strcpy(cmdlineCopy, cmdline);           // restore cmdline
-        char *pipe_segments[MAX_PIPE_SEGMENTS]; // array of strings to store pipe command segments
-        int num_pipe_segments;
-        parse_arguments(pipe_segments, cmdline, &num_pipe_segments, PIPE_CHAR); // parse our cmdline according to pipe char |
-        strcpy(cmdline, cmdlineCopy);                                           // restore cmdline
-
-        if (num_pipe_segments == 1)
-        {                       // single command, no pipe case --> original handling
-            printf("cmdline = %s\n", cmdline);
-            pid_t pid = fork(); // fork a child
-            if (pid == 0)
-                process_cmd(cmdline); // child will execvp and process cmdline
-            else
-                wait(0); // parent will wait for child to terminate
+                printf("%d\n", lines); //display amount of (nextline character) lines
+            }
         }
+        else {
+            strcpy(cmdline, cmdlineCopy); //for some reason cmdline change? 
+            //restore it if it is not cd, i.e some other command using "|" as seperation
+            continue; //continue the loop so it doesn't stuck here 
+            //but what if we need the latter codes????~
+        }
+*/
+    //pipe handling 
+    /* 
+    eg: ls | wc -l 
+    for (n level pipe)
+        int pipe_arr[2]; // arr[0] is input end, arr[1] is output end 
+        pipe(pipe_arr); 
+        fork();
+        if(pid == 0) // inside child 
+            dup2(arr[0], STDOUT) //stdout of child(ls) input to pipe 
+            execlp(ls command portion)
+        else //inside parent 
+            dup2(arr[1], STDIN) //input of parent is output of child 
+            //input of wc is ls
 
-        
+    */
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+            // the child process handles the command
+            process_cmd(cmdline);
+        }
+        else
+        {
+            // the parent process simply wait for the child and do nothing
+            wait(0);
+        }
     }
+
     return 0;
 }
