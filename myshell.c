@@ -235,7 +235,7 @@ int main()
         // the change: wc -l < myshell.c -> wc as it inserts null terminator whenever there's SPACE_CHARS
         strcpy(cmdlineCopy, cmdline);
         parse_arguments(arg, cmdline, &arg_num, SPACE_CHARS); //divide command according to space, store segments to arg array 
-        strcpy(cmdline, cmdlineCopy); //restore cmdline 
+        //when did I add this???//strcpy(cmdline, cmdlineCopy); //restore cmdline 
         //special case: cd handling 
         if(!strcmp(arg[0],"cd")){ //detect if its cd 
             strcpy(path, arg[1]); //change the path variable to destination
@@ -272,7 +272,21 @@ int main()
             //but what if we need the latter codes????~
         }
 */
+    //pipe handling 
+    /* 
+    eg: ls | wc -l 
+    for (n level pipe)
+        int pipe_arr[2]; // arr[0] is input end, arr[1] is output end 
+        pipe(pipe_arr); 
+        fork();
+        if(pid == 0) // inside child 
+            dup2(arr[0], STDOUT) //stdout of child(ls) input to pipe 
+            execlp(ls command portion)
+        else //inside parent 
+            dup2(arr[1], STDIN) //input of parent is output of child 
+            //input of wc is ls
 
+    */
         pid_t pid = fork();
         if (pid == 0)
         {
