@@ -173,7 +173,7 @@ void process_cmd(char *cmdline) // only child calls it, as execvp replace addres
     { // handle output case
         if (!strcmp(arg[i], ">"))
         {                                                            // output case
-            int fd = open(arg[i + 1], O_WRONLY | O_CREAT | O_TRUNC); // use open to get file descriptor of that particular file
+            int fd = open(arg[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0666); // FIXED: added ,0666 (required by O_CREAT)
             // open() note: arg[i+1] is the file name, and apparently we need more flag
             dup2(fd, 1); // stdin(1) points to the new fd --> redirection
             close(fd);   ////closing fd, why we do this? lab example?
@@ -300,7 +300,7 @@ int main()
 
         char *pipe_segments[MAX_PIPE_SEGMENTS]; // array of strings to store pipe command segments
         int num_pipe_segments;
-        parse_arguments(pipe_segments, cmdlineCopy, &num_pipe_segments, PIPE_CHAR); // FIXED: use clean copy (was cmdline)
+        parse_arguments(pipe_segments, cmdlineCopy, &num_pipe_segments, PIPE_CHAR); // parse our cmdline according to pipe char |
         strcpy(cmdline, cmdlineCopy);                                           // restore cmdline
 
         if (num_pipe_segments == 1)
