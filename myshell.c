@@ -172,7 +172,7 @@ void process_cmd(char *cmdline) // only child calls it, as execvp replace addres
     for (int i = 0; i < arg_num; i++)
     { // handle output case
         if (!strcmp(arg[i], ">"))
-        {                                                            // output case
+        {                                                                  // output case
             int fd = open(arg[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0666); // FIXED: added ,0666 (required by O_CREAT)
             // open() note: arg[i+1] is the file name, and apparently we need more flag
             dup2(fd, 1); // stdin(1) points to the new fd --> redirection
@@ -222,7 +222,7 @@ int main()
     char path[256];
 
     // The main event loop
-    char exit[] = "exit";
+    char exit_char[] = "exit";
     while (1)
     {
         getcwd(path, 256);
@@ -231,7 +231,7 @@ int main()
             continue; /* empty line handling */
 
         // TODO: implement the exit command
-        if (!strcmp(cmdline, exit))
+        if (!strcmp(cmdline, exit_char))
         {
             printf(TEMPLATE_MYSHELL_END, getpid());
             break;
@@ -301,7 +301,7 @@ int main()
         char *pipe_segments[MAX_PIPE_SEGMENTS]; // array of strings to store pipe command segments
         int num_pipe_segments;
         parse_arguments(pipe_segments, cmdlineCopy, &num_pipe_segments, PIPE_CHAR); // parse our cmdline according to pipe char |
-        strcpy(cmdline, cmdlineCopy);                                           // restore cmdline
+        strcpy(cmdline, cmdlineCopy);                                               // restore cmdline
 
         if (num_pipe_segments == 1)
         {                       // single command, no pipe case --> original handling
@@ -311,44 +311,73 @@ int main()
             else
                 wait(0); // parent will wait for child to terminate
         }
+
         else
-        { // else that we have some  | | | | | bruh
+        { // multi-pipe
             int pipes[MAX_PIPE_SEGMENTS - 1][2];
+
+            // Create pipes
             for (int i = 0; i < num_pipe_segments - 1; i++)
             {
-                pipe(pipes[i]); // create whatever amount of pipe we need
+                if (pipe(pipes[i]) == -1)
+                {
+                    perror("pipe");
+                    exit(1);
+                }
             }
+
             for (int i = 0; i < num_pipe_segments; i++)
             {
                 pid_t pid = fork();
+                if (pid == -1)
+                {
+                    perror("fork");
+                    exit(1);
+                }
                 if (pid == 0)
-                { // child
+                { // CHILD
+                    // Close ALL unused pipes first (prevents any FD leak)
+                    for (int j = 0; j < num_pipe_segments - 1; j++)
+                    {
+                        if (j < i - 1 || j > i)
+                        { // much safer than the != trick
+                            close(pipes[j][0]);
+                            close(pipes[j][1]);
+                        }
+                    }
+
                     if (i > 0)
-                    {                                        // not first segment
-                        dup2(pipes[i - 1][0], STDIN_FILENO); // i-1: if we on 2 segment, we using pipe 1
-                        // stdin now comes from
-                        close(pipes[i - 1][0]); // tell kernel these fd are not needed anymore
-                        close(pipes[i - 1][1]); // tell kernel these fd are not needed anymore
+                    {
+                        dup2(pipes[i - 1][0], STDIN_FILENO);
+                        close(pipes[i - 1][0]);
+                        close(pipes[i - 1][1]);
                     }
                     if (i < num_pipe_segments - 1)
-                    {                                     // not the last segment
-                        dup2(pipes[i][1], STDOUT_FILENO); // ← write end of CURRENT pipe
-                        close(pipes[i][0]);               // tell kernel these fd are not needed anymore
-                        close(pipes[i][1]);               // tell kernel these fd are not needed anymore
+                    {
+                        dup2(pipes[i][1], STDOUT_FILENO);
+                        close(pipes[i][0]);
+                        close(pipes[i][1]);
                     }
-                    process_cmd(pipe_segments[i]); // well, process
+
+                    process_cmd(pipe_segments[i]);
+                    exit(127); // IMPORTANT: execvp failed
                 }
-                // parent need to do the cleanup, close every pipe read write
+
+                // PARENT: close ends we no longer need
+                if (i > 0)
+                {
+                    close(pipes[i - 1][0]); // previous read end
+                }
+                if (i < num_pipe_segments - 1)
+                {
+                    close(pipes[i][1]); // current write end
+                }
             }
-            // parent cleanup (moved here so it runs only once after all forks)
-            for (int i = 0; i < num_pipe_segments - 1; i++)
-            {
-                close(pipes[i][0]);
-                close(pipes[i][1]);
-            }
+
+            // NO final cleanup loop needed — everything is already closed
             for (int i = 0; i < num_pipe_segments; i++)
             {
-                wait(0);
+                wait(NULL);
             }
         }
     }
