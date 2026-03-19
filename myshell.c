@@ -1,4 +1,3 @@
-
 /*
     COMP3511 Spring 2026
     PA1: Simplified Linux Shell (MyShell)
@@ -158,11 +157,12 @@ static void trim_inplace(char *s)
 void process_cmd(char *cmdline) // only child calls it, as execvp replace address space
 {                               // all happens in child process
     // Uncomment this line to check the content of cmdline
-    // fprintf(stderr, "process_cmd: '%s'\n", cmdline);
+    // printf("cmdline = %s\n", cmdline);
+    // my setup restore cmdline to its original form
 
-    // allow up to 8 args + terminating NULL
-    char *arg[MAX_ARGUMENTS_PER_SEGMENT];   // was MAX_ARGUMENTS
-    int arg_num;
+    // so Step 1: get tokenized cmdline into arg
+    char *arg[MAX_ARGUMENTS_PER_SEGMENT];                             // tokenized arguments in arg[0], arg[1] ...
+    int arg_num;                                          // number of tokens
     parse_arguments(arg, cmdline, &arg_num, SPACE_CHARS); // store tokens in arg
 
     // safety: do not exceed buffer
@@ -171,7 +171,8 @@ void process_cmd(char *cmdline) // only child calls it, as execvp replace addres
         exit(1);
     }
 
-    // handle input redirection "<"
+    // cmdline only has arg[0] now
+    // for loop handle the input redirection case
     for (int i = 0; i < arg_num; i++)
     { // search for index i for "<"
         if (!strcmp(arg[i], "<"))
@@ -182,8 +183,9 @@ void process_cmd(char *cmdline) // only child calls it, as execvp replace addres
             }
             int fd = open(arg[i + 1], O_RDONLY); // use open to get file descriptor of that particular file
             if (fd == -1) { perror("open"); exit(1); }
-            if (dup2(fd, STDIN_FILENO) == -1) { perror("dup2"); close(fd); exit(1); }
-            close(fd);
+            // open() note: arg[i+1] is the file name, O_RDONLY is the flag for read only access
+            if (dup2(fd, STDIN_FILENO) == -1) { perror("dup2"); close(fd); exit(1); } // stdin(0) points to the new fd --> redirection
+            close(fd);   // closing fd, why we do this? lab example?
 
             // now we delete the < filename before we pass it to the binary
             for (int j = i; j < arg_num - 2; j++)
@@ -194,7 +196,6 @@ void process_cmd(char *cmdline) // only child calls it, as execvp replace addres
             break; // end for as we handle at most 1 of this
         }
     }
-    // handle output case
     for (int i = 0; i < arg_num; i++)
     { // handle output case
         if (!strcmp(arg[i], ">"))
@@ -205,8 +206,9 @@ void process_cmd(char *cmdline) // only child calls it, as execvp replace addres
             }
             int fd = open(arg[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0666); // FIXED: added ,0666 (required by O_CREAT)
             if (fd == -1) { perror("open"); exit(1); }
-            if (dup2(fd, STDOUT_FILENO) == -1) { perror("dup2"); close(fd); exit(1); }
-            close(fd);
+            // open() note: arg[i+1] is the file name, and apparently we need more flag
+            if (dup2(fd, STDOUT_FILENO) == -1) { perror("dup2"); close(fd); exit(1); } // stdin(1) points to the new fd --> redirection
+            close(fd);   ////closing fd, why we do this? lab example?
 
             // now we delete the > filename before we pass it to the binary
             for (int j = i; j < arg_num - 2; j++)
@@ -221,13 +223,12 @@ void process_cmd(char *cmdline) // only child calls it, as execvp replace addres
     arg[arg_num] = NULL; // required by execvp
 
     if (arg_num == 0 || arg[0] == NULL || strlen(arg[0]) == 0) {
-        // nothing to execute
         exit(0);
     }
 
     execvp(arg[0], arg); // execute: replace the fork with arg[0] binary, eg wc, ls, etc
     // arg is the pointer to char * (array of strings) stores the tokenized command
-    perror("execvp"); // print why exec failed
+    perror("execvp");
     exit(127); // ensure the process cmd is finished
 }
 
@@ -280,12 +281,11 @@ int main()
         strncpy(cmdlineCopy, cmdline, MAX_CMDLINE_LENGTH);
         cmdlineCopy[MAX_CMDLINE_LENGTH - 1] = '\0';
         parse_arguments(arg, cmdlineCopy, &arg_num, SPACE_CHARS); // divide command according to space, store segments to arg array
-
+        // when did I add this???//strcpy(cmdline, cmdlineCopy); //restore cmdline
         // special case: cd handling
         if (arg_num > 0 && !strcmp(arg[0], "cd"))
         {                           // detect if its cd
             if (arg_num < 2) {
-                // no argument: go to HOME
                 char *home = getenv("HOME");
                 if (!home) {
                     printf(TEMPLATE_MYSHELL_CD_ERROR);
@@ -297,29 +297,63 @@ int main()
                 }
             } else {
                 if (chdir(arg[1]) == -1)
-                {
+                {                                      // fail condition
                     printf(TEMPLATE_MYSHELL_CD_ERROR); // print error message
                     continue;                          // continue the polling
                 }
             }
             continue; // continue if everything fine
         }
+        /*
+                else if(!strcmp(arg[0], "wc") && !strcmp(arg[1], "-l")){ //implement of the wc -l < file command
+                    if(!strcmp(arg[2], "<")){ //input redirection case: file content input to feed wc command --> count number of lines
+                        int fd = open(arg[3], O_RDONLY); //get file id
+                        char buffer[4096]; //buffer for reading file text
+                        int bytes;
+                        int lines = 0;
+                        close(0); //closing stdin, file descriptor 0
+                        dup(fd); //replace stdin with file, automatically look for smallest available descriptor
+                        while((bytes = read(fd, buffer, 4096))>0){ //read return byte it read, keeps returning the accumulate amount it read until all, then return zero
+                            for(int i = 0; i < bytes; i++){ //search for next line character and increase counter
+                                if(buffer[i] == '\n'){
+                                    lines++;
+                                }
+                            }
+                        }
+                        printf("%d\n", lines); //display amount of (nextline character) lines
+                    }
+                }
+                else {
+                    strcpy(cmdline, cmdlineCopy); //for some reason cmdline change?
+                    //restore it if it is not cd, i.e some other command using "|" as seperation
+                    continue; //continue the loop so it doesn't stuck here
+                    //but what if we need the latter codes????~
+                }
+        */
+        // pipe handling
+        /*
+        eg: ls | wc -l
+        for (n level pipe)
+            int pipe_arr[2]; // arr[0] is input end, arr[1] is output end
+            pipe(pipe_arr);
+            fork();
+            if(pid == 0) // inside child
+                dup2(arr[0], STDOUT) //stdout of child(ls) input to pipe
+                execlp(ls command portion)
+            else //inside parent
+                dup2(arr[1], STDIN) //input of parent is output of child
+                //input of wc is ls
 
-        // Prepare for pipe handling: parse by '|'
-        char *pipe_segments[MAX_PIPE_SEGMENTS];
+        */
+
+        char *pipe_segments[MAX_PIPE_SEGMENTS]; // array of strings to store pipe command segments
         int num_pipe_segments;
-        // We need to operate on a modifiable copy for strtok
         strncpy(cmdlineCopy, cmdline, MAX_CMDLINE_LENGTH);
         cmdlineCopy[MAX_CMDLINE_LENGTH - 1] = '\0';
-        parse_arguments(pipe_segments, cmdlineCopy, &num_pipe_segments, PIPE_CHAR);
-
+        parse_arguments(pipe_segments, cmdlineCopy, &num_pipe_segments, PIPE_CHAR); // parse our cmdline according to pipe char |
         // Trim whitespace around each segment
         for (int i = 0; i < num_pipe_segments; i++) {
             trim_inplace(pipe_segments[i]);
-        }
-
-        if (num_pipe_segments <= 0) {
-            continue;
         }
 
         if (num_pipe_segments == 1)
@@ -329,14 +363,10 @@ int main()
                 perror("fork");
                 continue;
             }
-            if (pid == 0) {
-                // child: execute single command (note: process_cmd expects a modifiable string)
-                process_cmd(pipe_segments[0]);
-                // if exec fails, process_cmd will exit
-                exit(127);
-            } else {
+            if (pid == 0)
+                process_cmd(pipe_segments[0]); // child will execvp and process cmdline
+            else
                 wait(0); // parent will wait for child to terminate
-            }
         }
 
         else
@@ -348,7 +378,7 @@ int main()
 
             int pipes[MAX_PIPE_SEGMENTS - 1][2];
 
-            /* Create all pipes first */
+            // Create pipes
             for (int i = 0; i < num_pipe_segments - 1; i++)
             {
                 if (pipe(pipes[i]) == -1)
@@ -359,11 +389,10 @@ int main()
                         close(pipes[k][0]);
                         close(pipes[k][1]);
                     }
-                    goto wait_children; // skip to waiting (none) and continue loop
+                    goto wait_children;
                 }
             }
 
-            /* Fork each segment */
             for (int i = 0; i < num_pipe_segments; i++)
             {
                 pid_t pid = fork();
@@ -377,71 +406,54 @@ int main()
                     }
                     break;
                 }
-
                 if (pid == 0)
-                { /* CHILD */
-
-                    /* If not the first segment, connect read end of previous pipe to stdin */
+                { // CHILD
+                    // Close ALL unused pipes first (prevents any FD leak)
+                    // Child only needs pipes[i-1][0] (if i>0) and pipes[i][1] (if i < last)
                     if (i > 0)
                     {
-                        if (dup2(pipes[i - 1][0], STDIN_FILENO) == -1)
-                        {
+                        if (dup2(pipes[i - 1][0], STDIN_FILENO) == -1) {
                             perror("dup2 stdin");
                             exit(1);
                         }
                     }
-
-                    /* If not the last segment, connect write end of current pipe to stdout */
                     if (i < num_pipe_segments - 1)
                     {
-                        if (dup2(pipes[i][1], STDOUT_FILENO) == -1)
-                        {
+                        if (dup2(pipes[i][1], STDOUT_FILENO) == -1) {
                             perror("dup2 stdout");
                             exit(1);
                         }
                     }
 
-                    /* Close all pipe fds in child (they are duplicated already if needed) */
                     for (int j = 0; j < num_pipe_segments - 1; j++)
                     {
                         close(pipes[j][0]);
                         close(pipes[j][1]);
                     }
 
-                    /* Execute the command segment */
-                    // Note: process_cmd will call execvp and exit on failure
                     process_cmd(pipe_segments[i]);
-
-                    /* If execvp fails */
-                    perror("execvp");
-                    exit(127);
+                    exit(127); // IMPORTANT: execvp failed
                 }
 
-                /* PARENT: close pipe ends that are no longer needed by the parent.
-                   After forking child i:
-                     - the parent does not need the read end of the previous pipe (i-1)
-                     - the parent does not need the write end of the current pipe (i)
-                   Closing these prevents the parent from keeping write ends open and blocking readers. */
+                // PARENT: close ends we no longer need
                 if (i > 0)
                 {
-                    close(pipes[i - 1][0]); /* previous read end */
+                    close(pipes[i - 1][0]); // previous read end
                 }
                 if (i < num_pipe_segments - 1)
                 {
-                    close(pipes[i][1]); /* current write end */
+                    close(pipes[i][1]); // current write end
                 }
             }
 
-            /* Parent: close any remaining pipe fds (defensive) */
+            // NO final cleanup loop needed — everything is already closed
             for (int j = 0; j < num_pipe_segments - 1; j++)
             {
-                /* Some fds may already be closed above; ignore errors */
                 close(pipes[j][0]);
                 close(pipes[j][1]);
             }
 
         wait_children:
-            /* Wait for all children */
             for (int i = 0; i < num_pipe_segments; i++)
             {
                 wait(NULL);
